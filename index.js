@@ -7,6 +7,23 @@ const {
   VoiceConnectionStatus
 } = require("@discordjs/voice");
 
+// 🔐 ENV
+const TOKEN = process.env.TOKEN;
+const GUILD_ID = process.env.GUILD_ID;
+const VOICE_CHANNEL_ID = process.env.VOICE_CHANNEL_ID;
+const ALLOWED_ROLES = process.env.ALLOWED_ROLE_ID?.split(",") || [];
+
+// ❗ VALIDASI
+if (!TOKEN) {
+  console.log("❌ TOKEN tidak ditemukan di Railway!");
+  process.exit(1);
+}
+
+if (!GUILD_ID || !VOICE_CHANNEL_ID) {
+  console.log("❌ GUILD_ID / VOICE_CHANNEL_ID belum diisi!");
+  process.exit(1);
+}
+
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
@@ -16,14 +33,11 @@ const client = new Client({
   ]
 });
 
-const PREFIX = "b";
-
-const GUILD_ID = process.env.GUILD_ID;
-const VOICE_CHANNEL_ID = process.env.VOICE_CHANNEL_ID;
+const PREFIX = "e";
 
 let connection;
 
-// 🔥 JOIN VC FUNCTION
+// 🔥 CONNECT VC
 async function connectToVC() {
   try {
     const guild = client.guilds.cache.get(GUILD_ID);
@@ -33,14 +47,14 @@ async function connectToVC() {
       channelId: VOICE_CHANNEL_ID,
       guildId: GUILD_ID,
       adapterCreator: guild.voiceAdapterCreator,
-      selfMute: true,
-      selfDeaf: true
+      selfMute: false,
+      selfDeaf: false
     });
 
     console.log("✅ Bot masuk voice channel");
 
     connection.on(VoiceConnectionStatus.Disconnected, async () => {
-      console.log("⚠️ Terputus, mencoba reconnect...");
+      console.log("⚠️ Disconnect, reconnect...");
       setTimeout(connectToVC, 3000);
     });
 
@@ -53,13 +67,25 @@ async function connectToVC() {
 // 🚀 READY
 client.on("ready", () => {
   console.log(`🔥 Login sebagai ${client.user.tag}`);
-  connectToVC();
+
+  setTimeout(() => {
+    connectToVC();
+  }, 5000);
 });
 
 // 🎮 COMMAND HANDLER
 client.on("messageCreate", async (msg) => {
   if (msg.author.bot) return;
   if (!msg.content.toLowerCase().startsWith(PREFIX)) return;
+
+  // 🔒 CEK ROLE
+  const hasAccess = msg.member.roles.cache.some(role =>
+    ALLOWED_ROLES.includes(role.id)
+  );
+
+  if (!hasAccess) {
+    return msg.reply("❌ Lu ga punya akses buat command ini!");
+  }
 
   const withoutPrefix = msg.content.slice(PREFIX.length).trim();
   const args = withoutPrefix.split(/ +/);
@@ -86,4 +112,4 @@ client.on("messageCreate", async (msg) => {
 });
 
 // 🔐 LOGIN
-client.login(process.env.TOKEN);
+client.login(TOKEN);
